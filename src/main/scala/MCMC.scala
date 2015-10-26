@@ -1,7 +1,23 @@
+/*
+ *  Licensed under the Apache License, Version 2.0 (the "License")
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ * /
+ */
+
 package ScalaMCMC
 
 import java.io.{FileOutputStream, OutputStreamWriter, BufferedWriter}
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.JavaConversions.{mapAsJavaMap, asScalaIterator}
 import breeze.linalg.{max, randomInt, DenseMatrix, DenseVector}
 import breeze.stats.distributions.{Rand, Gaussian}
@@ -28,14 +44,14 @@ object MCMC extends App with Sampling {
 
 
   //latest state and output queue
-  val latest = new ConcurrentHashMap[V,S](mapAsJavaMap(initial))
+  val latest = new AtomicReference[Map[V,S]](initial)
   val out = new ConcurrentLinkedQueue[Map[V,S]]
   out.add(initial)
 
   //run MCMC
   for(i <- (1 until nMC).par){
-    val next = applyKernel(latest)
-    latest.put(theta, next.get(theta).orNull)
+    val next = applyKernel(latest.get())
+    latest.set(next)
     out.add(next)
 
     if (i % max(nMC / 10, 1) == 0) {
@@ -52,8 +68,8 @@ object MCMC extends App with Sampling {
   }
 
   //internal MCMC functions
-  def applyKernel(latest: ConcurrentHashMap[V,S]): Map[V,S] = {
-    val oldx = latest.get(theta)
+  def applyKernel(latest: Map[V,S]): Map[V,S] = {
+    val oldx = latest.get(theta).orNull
     val nextIdx = Rand.generator.nextInt(oldx.length)
 
     val next = updateNormal(nextIdx, oldx, mu, Sigma)
