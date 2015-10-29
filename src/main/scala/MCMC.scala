@@ -1,4 +1,6 @@
 /*
+ *  Copyright 2015 Alexander Terenin
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License")
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
@@ -18,13 +20,15 @@ package ScalaMCMC
 import java.io.{FileOutputStream, OutputStreamWriter, BufferedWriter}
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.ConcurrentLinkedQueue
-import scala.collection.JavaConversions.{mapAsJavaMap, asScalaIterator}
-import breeze.linalg.{max, randomInt, DenseMatrix, DenseVector}
+import breeze.numerics.sqrt
+
+import scala.collection.JavaConversions.asScalaIterator
+import breeze.linalg.{inv, max, DenseMatrix, DenseVector, lowerTriangular, strictlyLowerTriangular}
 import breeze.stats.distributions.{Rand, Gaussian}
 
-object MCMC extends App with Sampling {
+object MCMC extends App {
   //setup
-  val nMC = 100000
+  val nMC = 1000000
   val nThreads = 8
   val seed = 1
 
@@ -38,7 +42,7 @@ object MCMC extends App with Sampling {
   val dim = 8
   val J = DenseMatrix.ones[Double](dim,dim) + (DenseMatrix.eye[Double](dim) :* 0.01)
   val h = DenseVector.zeros[Double](dim)
-  val Sigma = invertSymmetricMatrix(J)
+  val Sigma = {M: DenseMatrix[Double] => lowerTriangular(M) + strictlyLowerTriangular(M).t}.apply(inv(J))
   val mu = Sigma * h
   val initial:Map[V,S] = Map(theta -> DenseVector.zeros[Double](dim))
 
@@ -93,12 +97,12 @@ object MCMC extends App with Sampling {
     val Sigma12 = Sigma(sidx, midx)
     val Sigma21 = Sigma(midx, sidx)
 
-    val Sigma22inv = breeze.linalg.inv(Sigma22.toDenseMatrix)
+    val Sigma22inv = inv(Sigma22.toDenseMatrix)
 
     val mustar = (mu1 + (Sigma12 * Sigma22inv * (x2 - mu2))).toArray.head
     val Sigmastar = (Sigma11 - (Sigma12 * Sigma22inv * Sigma21)).toDenseMatrix.toArray.head
 
-    val stddev = breeze.numerics.sqrt(Sigmastar)
+    val stddev = sqrt(Sigmastar)
 
     val out = Gaussian(mustar, stddev).draw()
     out
