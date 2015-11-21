@@ -67,9 +67,10 @@ object MCMC extends App {
   val fileName = "output/out"
   println(s"writing output of length ${out.size}")
   val writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))
-  for(v <- asScalaIterator(out.iterator)) {
-    writer.write(s"${v.get(theta).orNull.data.mkString(",")}\n")
-  }
+  out.iterator.foreach(
+    v => writer.write(s"${v.get(theta).orNull.data.mkString(",")}\n")
+  )
+  writer.close()
 
   //internal MCMC functions
   def applyKernel(latest: Map[V,S]): Map[V,S] = {
